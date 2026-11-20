@@ -20,7 +20,7 @@ class Mahasiswa extends ResourceController
 }
     /**
      * Return the properties of a resource object.
-     *
+     *ph
      * @param int|string|null $id
      *
      * @return ResponseInterface
