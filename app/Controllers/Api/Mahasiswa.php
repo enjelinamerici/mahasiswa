@@ -45,8 +45,13 @@ class Mahasiswa extends BaseApi
             $param[] = $kelas;
         }
 
-        $total = (int) $db->query("SELECT COUNT(*) AS n FROM akademik.v_mahasiswa_publik $where", $param)->getRow()->n;
-        $rows  = $db->query(
+
+        $total = (int) $db->query(
+            "SELECT COUNT(*) AS n FROM akademik.v_mahasiswa_publik $where",
+            $param
+        )->getRow()->n;
+
+        $rows = $db->query(
             "SELECT * FROM akademik.v_mahasiswa_publik $where ORDER BY nim LIMIT ? OFFSET ?",
             array_merge($param, [$limit, ($page - 1) * $limit])
         )->getResultArray();
@@ -208,21 +213,22 @@ class Mahasiswa extends BaseApi
     }
 
     // ---- pembantu ----
-    private function nimValid($nim): bool
-    {
-        return is_string($nim) && preg_match('/^\d{10}$/', $nim) === 1;
-    }
+// ---- pembantu ----
+private function nimValid($nim): bool
+{
+    return is_string($nim) && preg_match('/^\d{10}$/', $nim) === 1;
+}
 
-    private function body(): ?array
-    {
-        $json = $this->request->getJSON(true);
-        return is_array($json) ? $json : null;
-    }
+private function body(): ?array
+{
+    $json = $this->request->getJSON(true);
+    return is_array($json) ? $json : null;
+}
 
-    private function ambil(string $nim): ?array
-    {
-        return \Config\Database::connect()
-            ->query('SELECT * FROM akademik.v_mahasiswa_detail WHERE nim = ?', [$nim])
-            ->getRowArray();
-    }
+private function ambil(string $nim): ?array
+{
+    return \Config\Database::connect()
+        ->query('SELECT * FROM akademik.v_mahasiswa_detail WHERE nim = ?', [$nim])
+        ->getRowArray();
+}
 }
