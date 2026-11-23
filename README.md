@@ -63,4 +63,4 @@ Semua response berformat `{ "status", "message", "data" }`.
 3. Kirim header `Authorization: Bearer <token>` ke endpoint `/api/v1/integrasi/...`.
 4. Token berlaku 1 jam. Jika mendapat `401`, login ulang.
 
-Field yang dibagikan: `nim, nama, jenis_kelamin, email, kelas, angkatan, status_akademik`.git add README.md
+Field yang dibagikan: `nim, nama, jenis_kelamin, email, kelas, angkatan, status_akademik`.
