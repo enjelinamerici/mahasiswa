@@ -30,9 +30,11 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
         $routes->delete('mahasiswa/(:segment)', 'Mahasiswa::delete/$1');
     });
 
-    // untuk kelompok lain
+       // untuk kelompok lain: hanya data publik
     $routes->group('', ['filter' => 'jwt:service,admin'], static function ($routes) {
+        $routes->get('integrasi/kelas', 'Integrasi::kelas');
         $routes->get('integrasi/mahasiswa', 'Integrasi::mahasiswa');
+        $routes->get('integrasi/mahasiswa/(:segment)', 'Integrasi::show/$1');
         $routes->get('integrasi/rekap', 'Integrasi::rekap');
     });
 });
