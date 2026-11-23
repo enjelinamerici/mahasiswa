@@ -3,10 +3,25 @@
 namespace App\Controllers\Api;
 
 use CodeIgniter\RESTful\ResourceController;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 class BaseApi extends ResourceController
 {
     protected $format = 'json';
+
+    // Isi token user yang login (role, nim, username)
+    protected function pengguna(): ?object
+    {
+        if (! preg_match('/^Bearer\s+(.+)$/i', $this->request->getHeaderLine('Authorization'), $m)) {
+            return null;
+        }
+        try {
+            return JWT::decode($m[1], new Key(env('JWT_SECRET'), 'HS256'));
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
 
     protected function sukses($data = null, string $pesan = 'OK', int $kode = 200)
     {
