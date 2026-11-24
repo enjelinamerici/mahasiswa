@@ -60,11 +60,18 @@ class Mahasiswa extends BaseApi
     }
 
     // GET /api/v1/mahasiswa/{nim}
-    public function show($nim = null)
+       public function show($nim = null)
     {
         if (! $this->nimValid($nim)) {
             return $this->gagal('NIM harus 10 digit angka', 422);
         }
+
+        // Role mahasiswa hanya boleh melihat detail dirinya sendiri
+        $u = $this->pengguna();
+        if ($u && $u->role === 'mahasiswa' && ($u->nim ?? null) !== $nim) {
+            return $this->gagal('Anda hanya boleh melihat data diri sendiri', 403);
+        }
+
         $row = $this->ambil($nim);
         if (! $row) {
             return $this->gagal('Mahasiswa tidak ditemukan', 404);

@@ -44,12 +44,37 @@ class Database extends Config
         'port'         => 5432,
         'numberNative' => false,
         'foundRows'    => false,
-        'dateFormat'   => [
+                'dateFormat'   => [
             'date'     => 'Y-m-d',
             'datetime' => 'Y-m-d H:i:s',
             'time'     => 'H:i:s',
-            'schema'  => 'akademik',
-'sslmode' => 'require',
+        ],
+        'schema'       => 'akademik',
+        'sslmode'      => 'require',
+    ];
+
+    // Koneksi khusus endpoint integrasi: login sebagai app_integrasi (least privilege).
+    // Isi di .env: database.integrasi.hostname / database / username / password
+    public array $integrasi = [
+        'DSN'        => '',
+        'hostname'   => 'localhost',
+        'username'   => '',
+        'password'   => '',
+        'database'   => '',
+        'DBDriver'   => 'Postgre',
+        'DBPrefix'   => '',
+        'pConnect'   => false,
+        'DBDebug'    => true,
+        'charset'    => 'utf8',
+        'swapPre'    => '',
+        'failover'   => [],
+        'port'       => 5432,
+        'schema'     => 'akademik',
+        'sslmode'    => 'require',
+        'dateFormat' => [
+            'date'     => 'Y-m-d',
+            'datetime' => 'Y-m-d H:i:s',
+            'time'     => 'H:i:s',
         ],
     ];
 
