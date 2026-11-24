@@ -30,6 +30,27 @@ class Mahasiswa extends BaseApi
         'tempat_lahir', 'tanggal_lahir', 'agama_id', 'suku_id', 'no_telepon', 'cita_cita',
     ];
 
+    // Data turunan (tabel lain) yang ikut disimpan saat tambah / ubah.
+    // Semuanya opsional; string kosong berarti "hapus / kosongkan".
+    private const ATURAN_TURUNAN = [
+        'alamat_ktp'           => 'max_length[500]',
+        'alamat_domisili'      => 'max_length[500]',
+        'nama_orang_tua'       => 'max_length[100]',
+        'no_telepon_orang_tua' => 'regex_match[/^\d{10,14}$/]',
+        'alamat_orang_tua'     => 'max_length[500]',
+    ];
+
+    // Atribut banyak-nilai: field JSON => [tabel referensi, tabel penghubung, kolom FK]
+    // Nilai boleh berupa array ["Membaca","Traveling"] atau teks "Membaca, Traveling".
+    private const DAFTAR = [
+        'minat_bakat'     => ['minat_bakat', 'mahasiswa_minat_bakat', 'minat_bakat_id'],
+        'keahlian'        => ['keahlian', 'mahasiswa_keahlian', 'keahlian_id'],
+        'bahasa'          => ['bahasa', 'mahasiswa_bahasa', 'bahasa_id'],
+        'hobi'            => ['hobi', 'mahasiswa_hobi', 'hobi_id'],
+        'makanan_favorit' => ['makanan', 'mahasiswa_makanan', 'makanan_id'],
+        'genre_musik'     => ['genre_musik', 'mahasiswa_genre_musik', 'genre_musik_id'],
+    ];
+
     // GET /api/v1/mahasiswa?limit=10&page=1&kelas=TRPL 1A
     public function index()
     {
@@ -91,14 +112,21 @@ class Mahasiswa extends BaseApi
         foreach (self::ATURAN as $k => $r) {
             $rules[$k] = (in_array($k, self::WAJIB, true) ? 'required|' : '') . $r;
         }
+        foreach (self::ATURAN_TURUNAN as $k => $r) {
+            $rules[$k] = 'permit_empty|' . $r;
+        }
         $v = \Config\Services::validation();
         $v->setRules($rules);
         if (! $v->run($data)) {
             return $this->gagal('Data tidak valid', 422, $v->getErrors());
         }
+        $daftar = $this->bacaDaftar($data);
+        if (isset($daftar['errors'])) {
+            return $this->gagal('Data tidak valid', 422, $daftar['errors']);
+        }
 
+        $db = \Config\Database::connect();
         try {
-            $db = \Config\Database::connect();
             if ($db->query('SELECT 1 FROM akademik.mahasiswa WHERE nim = ?', [$data['nim']])->getRowArray()) {
                 return $this->gagal('NIM sudah terdaftar', 409);
             }
@@ -113,10 +141,20 @@ class Mahasiswa extends BaseApi
                 }
             }
             $holder = implode(', ', array_fill(0, count($cols), '?'));
+
+            // TRANSAKSI: mahasiswa + alamat + orang tua + atribut lain disimpan
+            // sekaligus. Jika satu langkah gagal, SEMUA dibatalkan (rollback).
+            $db->transException(true)->transBegin();
             $db->query('INSERT INTO akademik.mahasiswa (' . implode(', ', $cols) . ") VALUES ($holder)", $vals);
+            $this->simpanTurunan($db, $data['nim'], $data, $daftar);
+            $db->transCommit();
 
             return $this->sukses($this->ambil($data['nim']), 'Mahasiswa berhasil ditambahkan', 201);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->gagal($e->getMessage(), 422);
         } catch (\Throwable $e) {
+            $db->transRollback();
             return $this->errorDb($e);
         }
     }
@@ -136,10 +174,17 @@ class Mahasiswa extends BaseApi
         foreach (self::BOLEH_UBAH as $k) {
             $rules[$k] = 'if_exist|' . str_replace('permit_empty|', '', self::ATURAN[$k]);
         }
+        foreach (self::ATURAN_TURUNAN as $k => $r) {
+            $rules[$k] = 'if_exist|permit_empty|' . $r;
+        }
         $v = \Config\Services::validation();
         $v->setRules($rules);
         if (! $v->run($data)) {
             return $this->gagal('Data tidak valid', 422, $v->getErrors());
+        }
+        $daftar = $this->bacaDaftar($data);
+        if (isset($daftar['errors'])) {
+            return $this->gagal('Data tidak valid', 422, $daftar['errors']);
         }
 
         $set = [];
@@ -150,25 +195,37 @@ class Mahasiswa extends BaseApi
                 $val[] = $data[$k] === '' ? null : $data[$k];
             }
         }
-        if (! $set) {
+        $adaTurunan = $daftar || array_intersect_key($data, self::ATURAN_TURUNAN);
+        if (! $set && ! $adaTurunan) {
             return $this->gagal('Tidak ada field yang diubah', 400);
         }
+        // updated_at selalu disentuh, sehingga version naik (trigger) walau
+        // yang diubah hanya data turunan -> optimistic locking tetap berlaku.
         $set[] = 'updated_at = now()';
         $val[] = $nim;
         $val[] = (int) $data['version'];
 
+        $db = \Config\Database::connect();
         try {
-            $db = \Config\Database::connect();
+            $db->transException(true)->transBegin();
             $db->query('UPDATE akademik.mahasiswa SET ' . implode(', ', $set) . ' WHERE nim = ? AND version = ?', $val);
 
             if ($db->affectedRows() === 0) {
+                $db->transRollback();
                 if (! $this->ambil($nim)) {
                     return $this->gagal('Mahasiswa tidak ditemukan', 404);
                 }
                 return $this->gagal('Data sudah diubah pengguna lain, muat ulang lalu coba lagi', 409);
             }
+            $this->simpanTurunan($db, $nim, $data, $daftar);
+            $db->transCommit();
+
             return $this->sukses($this->ambil($nim), 'Mahasiswa berhasil diubah');
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->gagal($e->getMessage(), 422);
         } catch (\Throwable $e) {
+            $db->transRollback();
             return $this->errorDb($e);
         }
     }
@@ -230,6 +287,117 @@ private function body(): ?array
 {
     $json = $this->request->getJSON(true);
     return is_array($json) ? $json : null;
+}
+
+// Baca atribut banyak-nilai dari body. Hasil: ['hobi' => ['Membaca', ...], ...]
+// hanya untuk field yang dikirim, atau ['errors' => [...]] jika formatnya salah.
+private function bacaDaftar(array $data): array
+{
+    $hasil  = [];
+    $errors = [];
+    foreach (array_keys(self::DAFTAR) as $k) {
+        if (! array_key_exists($k, $data)) {
+            continue;
+        }
+        $nilai = $data[$k];
+        if ($nilai === null) {
+            $nilai = [];
+        } elseif (is_string($nilai)) {
+            $nilai = explode(',', $nilai);
+        }
+        if (! is_array($nilai)) {
+            $errors[$k] = "$k harus berupa daftar teks";
+            continue;
+        }
+        $bersih = [];
+        foreach ($nilai as $item) {
+            if (! is_string($item)) {
+                $errors[$k] = "$k harus berupa daftar teks";
+                continue 2;
+            }
+            $item = trim(preg_replace('/\s+/', ' ', $item));
+            if ($item !== '') {
+                $bersih[mb_strtolower($item)] ??= $item; // buang duplikat (yang pertama dipakai)
+            }
+        }
+        if (count($bersih) > 20) {
+            $errors[$k] = "$k maksimal 20 item";
+            continue;
+        }
+        $hasil[$k] = array_values($bersih);
+    }
+    return $errors ? ['errors' => $errors] : $hasil;
+}
+
+// Simpan alamat, orang tua, dan atribut banyak-nilai.
+// Dipanggil DI DALAM transaksi; jika ada error, pemanggil melakukan rollback.
+private function simpanTurunan($db, string $nim, array $data, array $daftar): void
+{
+    // 1. Alamat KTP & domisili (satu baris per jenis)
+    foreach (['alamat_ktp' => 'KTP', 'alamat_domisili' => 'DOMISILI'] as $k => $jenis) {
+        if (! array_key_exists($k, $data)) {
+            continue;
+        }
+        $alamat = trim((string) $data[$k]);
+        if ($alamat === '') {
+            $db->query('DELETE FROM akademik.alamat_mahasiswa WHERE nim = ? AND jenis = ?', [$nim, $jenis]);
+        } else {
+            $db->query(
+                'INSERT INTO akademik.alamat_mahasiswa (nim, jenis, alamat) VALUES (?, ?, ?)
+                 ON CONFLICT (nim, jenis) DO UPDATE SET alamat = EXCLUDED.alamat',
+                [$nim, $jenis, $alamat]
+            );
+        }
+    }
+
+    // 2. Orang tua (baris pertama milik mahasiswa ini)
+    $kolomOrtu = ['nama_orang_tua' => 'nama', 'no_telepon_orang_tua' => 'no_telepon', 'alamat_orang_tua' => 'alamat'];
+    if (array_intersect_key($data, $kolomOrtu)) {
+        $ortu = $db->query('SELECT id FROM akademik.orang_tua WHERE nim = ? ORDER BY id LIMIT 1', [$nim])->getRowArray();
+        $nama = array_key_exists('nama_orang_tua', $data) ? trim((string) $data['nama_orang_tua']) : null;
+
+        $isiLain = trim((string) ($data['no_telepon_orang_tua'] ?? '')) !== ''
+                || trim((string) ($data['alamat_orang_tua'] ?? '')) !== '';
+
+        if ($nama === '' && $isiLain) {
+            throw new \DomainException('nama_orang_tua wajib diisi jika mengisi data orang tua');
+        } elseif ($nama === '') {
+            $db->query('DELETE FROM akademik.orang_tua WHERE nim = ?', [$nim]);
+        } elseif ($ortu) {
+            $set = [];
+            $val = [];
+            foreach ($kolomOrtu as $field => $kolom) {
+                if (array_key_exists($field, $data)) {
+                    $isi   = trim((string) $data[$field]);
+                    $set[] = "$kolom = ?";
+                    $val[] = $isi === '' ? null : $isi;
+                }
+            }
+            $val[] = $ortu['id'];
+            $db->query('UPDATE akademik.orang_tua SET ' . implode(', ', $set) . ' WHERE id = ?', $val);
+        } elseif ($nama !== null) {
+            $telp   = trim((string) ($data['no_telepon_orang_tua'] ?? ''));
+            $alamat = trim((string) ($data['alamat_orang_tua'] ?? ''));
+            $db->query(
+                'INSERT INTO akademik.orang_tua (nim, nama, no_telepon, alamat) VALUES (?, ?, ?, ?)',
+                [$nim, $nama, $telp === '' ? null : $telp, $alamat === '' ? null : $alamat]
+            );
+        } elseif ($isiLain) {
+            throw new \DomainException('nama_orang_tua wajib diisi jika mengisi data orang tua');
+        }
+    }
+
+    // 3. Atribut banyak-nilai: ganti seluruh isi untuk field yang dikirim
+    foreach ($daftar as $k => $items) {
+        [$tabelRef, $tabelHubung, $fk] = self::DAFTAR[$k];
+        $db->query("DELETE FROM akademik.$tabelHubung WHERE nim = ?", [$nim]);
+        foreach ($items as $nama) {
+            $row = $db->query("SELECT id FROM akademik.$tabelRef WHERE lower(nama) = lower(?) LIMIT 1", [$nama])->getRowArray();
+            $id  = $row ? $row['id']
+                : $db->query("INSERT INTO akademik.$tabelRef (nama) VALUES (?) RETURNING id", [$nama])->getRowArray()['id'];
+            $db->query("INSERT INTO akademik.$tabelHubung (nim, $fk) VALUES (?, ?)", [$nim, $id]);
+        }
+    }
 }
 
 private function ambil(string $nim): ?array

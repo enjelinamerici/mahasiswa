@@ -50,8 +50,11 @@ class BaseApi extends ResourceController
         if (str_contains($m, 'tidak ditemukan')) {
             return $this->gagal('Data tidak ditemukan', 404);
         }
-        if (str_contains($m, 'violates')) {
-            return $this->gagal('Data melanggar aturan database', 422);
+                if (str_contains($m, 'violates')) {
+            return $this->gagal('Data melanggar aturan database. Semua perubahan dibatalkan (rollback)', 422);
+        }
+        if (str_contains($m, 'value too long')) {
+            return $this->gagal('Ada isian yang terlalu panjang untuk database. Semua perubahan dibatalkan (rollback)', 422);
         }
         log_message('error', $m);
         return $this->gagal('Terjadi kesalahan pada server', 500);
