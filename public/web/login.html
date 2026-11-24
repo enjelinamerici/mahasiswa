@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — Portal Akademik TRPL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
+      padding: 20px;
+    }
+    .card {
+      background: #ffffff;
+      width: 100%;
+      max-width: 400px;
+      padding: 40px 32px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.35);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .brand-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #fff;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    h1 { font-size: 22px; font-weight: 700; color: #0f172a; text-align: center; margin-bottom: 6px; }
+    p.sub { font-size: 14px; color: #64748b; text-align: center; margin-bottom: 28px; }
+    .group { margin-bottom: 18px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #0f172a;
+      transition: all 0.2s;
+      background: #f8fafc;
+    }
+    input:focus {
+      outline: none;
+      border-color: #2563eb;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    }
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4); }
+    button:active { transform: translateY(0); }
+    #pesan {
+      margin-top: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      min-height: 20px;
+      color: #dc2626;
+    }
+    #pesan.loading { color: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="brand-icon">SI</div>
+    </div>
+    <h1>Selamat Datang</h1>
+    <p class="sub">Sistem Informasi Manajemen Mahasiswa</p>
+    <form id="formLogin">
+      <div class="group">
+        <label for="username">Username</label>
+        <input id="username" placeholder="Masukkan username" autocomplete="username" required>
+      </div>
+      <div class="group">
+        <label for="password">Password</label>
+        <input id="password" type="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button type="submit">Masuk ke Dashboard</button>
+    </form>
+    <div id="pesan"></div>
+  </div>
+  <script>
+    document.getElementById('formLogin').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pesan = document.getElementById('pesan');
+      pesan.className = 'loading';
+      pesan.textContent = 'Memverifikasi akun...';
+      try {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('username').value.trim(),
+            password: document.getElementById('password').value
+          })
+        });
+        const json = await res.json();
+        if (res.ok && json.data && json.data.token) {
+          localStorage.setItem('token', json.data.token);
+          location.href = 'mahasiswa.html';
+        } else {
+          pesan.className = '';
+          pesan.textContent = json.message || 'Username atau password salah';
+        }
+      } catch (err) {
+        pesan.className = '';
+        pesan.textContent = 'Tidak dapat terhubung ke server';
+      }
+    });
+  </script>
+</body>
+</html>
