@@ -64,3 +64,29 @@ Semua response berformat `{ "status", "message", "data" }`.
 4. Token berlaku 1 jam. Jika mendapat `401`, login ulang.
 
 Field yang dibagikan: `nim, nama, jenis_kelamin, email, kelas, angkatan, status_akademik`.
+
+
+## Tambah / ubah mahasiswa beserta data turunan
+
+`POST /mahasiswa` dan `PUT /mahasiswa/{nim}` juga menerima field opsional berikut.
+Semuanya disimpan **dalam satu transaksi**: jika satu bagian gagal, seluruh perubahan dibatalkan (rollback).
+
+| Field | Contoh | Keterangan |
+|---|---|---|
+| `alamat_ktp`, `alamat_domisili` | `"Jl. Sutomo No. 109"` | `""` saat ubah = hapus alamat |
+| `nama_orang_tua` | `"BONAR SITANGGANG"` | wajib jika mengisi no. telepon/alamat orang tua |
+| `no_telepon_orang_tua` | `"081300008300"` | 10–14 digit |
+| `alamat_orang_tua` | `"Jl. Sutomo No. 109"` | |
+| `minat_bakat`, `keahlian`, `bahasa`, `hobi`, `makanan_favorit`, `genre_musik` | `["Membaca", "Futsal"]` atau `"Membaca, Futsal"` | saat ubah, isi lama diganti seluruhnya; `[]` = kosongkan |
+
+Contoh:
+```json
+{
+  "nim": "2605189001", "nama": "UJI", "jenis_kelamin": "L",
+  "email": "uji@students.polmed.ac.id", "kelas_id": 1, "angkatan": 2026,
+  "status_akademik": "Aktif", "tempat_lahir": "Medan", "tanggal_lahir": "2008-01-01", "agama_id": 1,
+  "alamat_ktp": "Jl. Contoh 1", "nama_orang_tua": "PAK UJI", "hobi": ["Renang", "Catur"]
+}
+```
+
+Web admin tersedia di `/web/login.html` (login sebagai admin atau operator untuk tambah/ubah, admin untuk hapus).
