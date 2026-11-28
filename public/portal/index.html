@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal Mahasiswa TRPL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-isi">
+      <a class="logo" href="#beranda">
+        <span class="logo-ikon">PM</span>
+        <span class="logo-teks"><b>Portal Mahasiswa</b><span>Teknologi Rekayasa Perangkat Lunak</span></span>
+      </a>
+      <div class="pengguna">
+        <div class="pengguna-teks"><b id="hNama">…</b><span id="hNim"></span></div>
+        <div class="avatar" id="hAvatar">…</div>
+        <button class="btn-keluar" id="btnKeluar" type="button">Keluar</button>
+      </div>
+    </div>
+  </header>
+  <nav class="nav">
+    <div class="nav-isi">
+      <a href="#beranda" data-hal="beranda">Beranda</a>
+      <a href="#profil" data-hal="profil">Profil Saya</a>
+      <a href="#jadwal" data-hal="jadwal">Jadwal Kuliah</a>
+      <a href="#matkul" data-hal="matkul">Mata Kuliah</a>
+      <a href="#teman" data-hal="teman">Teman Sekelas</a>
+      <a href="#organisasi" data-hal="organisasi">Organisasi</a>
+      <a href="#akun" data-hal="akun">Akun</a>
+    </div>
+  </nav>
+  <main id="konten"><div class="memuat">Memuat…</div></main>
+
+  <script src="integrasi.js"></script>
+  <script src="portal.js"></script>
+</body>
+</html>

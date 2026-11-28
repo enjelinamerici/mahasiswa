@@ -129,8 +129,18 @@
         });
         const json = await res.json();
         if (res.ok && json.data && json.data.token) {
-          localStorage.setItem('token', json.data.token);
-          location.href = 'mahasiswa.html';
+          // Web Admin hanya untuk admin & operator
+          const role = json.data.role;
+          if (role === 'admin' || role === 'operator') {
+            localStorage.setItem('token', json.data.token);
+            location.href = 'mahasiswa.html';
+          } else if (role === 'mahasiswa') {
+            pesan.className = '';
+            pesan.innerHTML = 'Akun mahasiswa tidak bisa masuk ke Web Admin. Silakan masuk lewat <a href="../portal/login.html">Portal Mahasiswa</a>.';
+          } else {
+            pesan.className = '';
+            pesan.textContent = 'Akun ini khusus untuk akses API kelompok lain, tidak bisa dipakai di Web Admin.';
+          }
         } else {
           pesan.className = '';
           pesan.textContent = json.message || 'Username atau password salah';

@@ -36,6 +36,20 @@ class Auth extends BaseApi
             'role' => $u['role'], 'nim' => $u['nim'],
         ], env('JWT_SECRET'), 'HS256');
 
-        return $this->sukses(['token' => $token, 'token_type' => 'Bearer', 'expires_in' => 3600], 'Login berhasil');
+        // Mahasiswa yang masih memakai password awal (tanggal lahir DDMMYYYY)
+        // diberi tanda, supaya aplikasi bisa mengingatkan untuk menggantinya.
+        $passwordAwal = false;
+        if ($u['role'] === 'mahasiswa' && $u['nim']) {
+            $tgl = $db->query('SELECT tanggal_lahir FROM akademik.mahasiswa WHERE nim = ?', [$u['nim']])->getRowArray();
+            $passwordAwal = $tgl && hash_equals(date('dmY', strtotime($tgl['tanggal_lahir'])), (string) $in['password']);
+        }
+
+        return $this->sukses([
+            'token'         => $token,
+            'token_type'    => 'Bearer',
+            'expires_in'    => 3600,
+            'role'          => $u['role'],
+            'password_awal' => $passwordAwal,
+        ], 'Login berhasil');
     }
 }

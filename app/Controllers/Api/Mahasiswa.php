@@ -4,12 +4,12 @@ namespace App\Controllers\Api;
 
 class Mahasiswa extends BaseApi
 {
-    private const WAJIB = [
+    protected const WAJIB = [
         'nim', 'nama', 'jenis_kelamin', 'email', 'kelas_id', 'angkatan',
         'status_akademik', 'tempat_lahir', 'tanggal_lahir', 'agama_id',
     ];
 
-    private const ATURAN = [
+    protected const ATURAN = [
         'nim'             => 'regex_match[/^\d{10}$/]',
         'nama'            => 'max_length[100]',
         'jenis_kelamin'   => 'in_list[L,P]',
@@ -25,14 +25,14 @@ class Mahasiswa extends BaseApi
         'cita_cita'       => 'permit_empty|max_length[100]',
     ];
 
-    private const BOLEH_UBAH = [
+    protected const BOLEH_UBAH = [
         'nama', 'jenis_kelamin', 'email', 'kelas_id', 'angkatan', 'status_akademik',
         'tempat_lahir', 'tanggal_lahir', 'agama_id', 'suku_id', 'no_telepon', 'cita_cita',
     ];
 
     // Data turunan (tabel lain) yang ikut disimpan saat tambah / ubah.
     // Semuanya opsional; string kosong berarti "hapus / kosongkan".
-    private const ATURAN_TURUNAN = [
+    protected const ATURAN_TURUNAN = [
         'alamat_ktp'           => 'max_length[500]',
         'alamat_domisili'      => 'max_length[500]',
         'nama_orang_tua'       => 'max_length[100]',
@@ -42,7 +42,7 @@ class Mahasiswa extends BaseApi
 
     // Atribut banyak-nilai: field JSON => [tabel referensi, tabel penghubung, kolom FK]
     // Nilai boleh berupa array ["Membaca","Traveling"] atau teks "Membaca, Traveling".
-    private const DAFTAR = [
+    protected const DAFTAR = [
         'minat_bakat'     => ['minat_bakat', 'mahasiswa_minat_bakat', 'minat_bakat_id'],
         'keahlian'        => ['keahlian', 'mahasiswa_keahlian', 'keahlian_id'],
         'bahasa'          => ['bahasa', 'mahasiswa_bahasa', 'bahasa_id'],
@@ -58,6 +58,16 @@ class Mahasiswa extends BaseApi
         $page   = max((int) ($this->request->getGet('page') ?? 1), 1);
         $kelas  = $this->request->getGet('kelas');
         $db     = \Config\Database::connect();
+
+        // Role mahasiswa hanya boleh melihat teman sekelasnya sendiri
+        // (filter kelas dari URL diabaikan, supaya tidak bisa mengintip kelas lain).
+        $u = $this->pengguna();
+        if ($u && $u->role === 'mahasiswa') {
+            $kelas = $this->kelasMahasiswa($db, (string) ($u->nim ?? ''));
+            if ($kelas === null) {
+                return $this->sukses(['items' => [], 'total' => 0, 'page' => $page, 'limit' => $limit]);
+            }
+        }
 
         $where  = '';
         $param  = [];
@@ -109,10 +119,10 @@ class Mahasiswa extends BaseApi
         }
 
         $rules = [];
-        foreach (self::ATURAN as $k => $r) {
-            $rules[$k] = (in_array($k, self::WAJIB, true) ? 'required|' : '') . $r;
+        foreach (static::ATURAN as $k => $r) {
+            $rules[$k] = (in_array($k, static::WAJIB, true) ? 'required|' : '') . $r;
         }
-        foreach (self::ATURAN_TURUNAN as $k => $r) {
+        foreach (static::ATURAN_TURUNAN as $k => $r) {
             $rules[$k] = 'permit_empty|' . $r;
         }
         $v = \Config\Services::validation();
@@ -131,7 +141,7 @@ class Mahasiswa extends BaseApi
                 return $this->gagal('NIM sudah terdaftar', 409);
             }
 
-            $kolom = array_merge(['nim'], self::BOLEH_UBAH);
+            $kolom = array_merge(['nim'], static::BOLEH_UBAH);
             $cols  = [];
             $vals  = [];
             foreach ($kolom as $k) {
@@ -147,6 +157,7 @@ class Mahasiswa extends BaseApi
             $db->transException(true)->transBegin();
             $db->query('INSERT INTO akademik.mahasiswa (' . implode(', ', $cols) . ") VALUES ($holder)", $vals);
             $this->simpanTurunan($db, $data['nim'], $data, $daftar);
+            $this->buatAkunMahasiswa($db, $data['nim'], (string) $data['tanggal_lahir']);
             $db->transCommit();
 
             return $this->sukses($this->ambil($data['nim']), 'Mahasiswa berhasil ditambahkan', 201);
@@ -170,11 +181,17 @@ class Mahasiswa extends BaseApi
             return $this->gagal('Body JSON kosong atau tidak valid', 400);
         }
 
+        return $this->prosesUbah($nim, $data);
+    }
+
+    // Logika ubah data (dipakai juga oleh PUT /profil milik mahasiswa).
+    protected function prosesUbah(string $nim, array $data)
+    {
         $rules = ['version' => 'required|is_natural_no_zero'];
-        foreach (self::BOLEH_UBAH as $k) {
-            $rules[$k] = 'if_exist|' . str_replace('permit_empty|', '', self::ATURAN[$k]);
+        foreach (static::BOLEH_UBAH as $k) {
+            $rules[$k] = 'if_exist|' . str_replace('permit_empty|', '', static::ATURAN[$k]);
         }
-        foreach (self::ATURAN_TURUNAN as $k => $r) {
+        foreach (static::ATURAN_TURUNAN as $k => $r) {
             $rules[$k] = 'if_exist|permit_empty|' . $r;
         }
         $v = \Config\Services::validation();
@@ -189,13 +206,13 @@ class Mahasiswa extends BaseApi
 
         $set = [];
         $val = [];
-        foreach (self::BOLEH_UBAH as $k) {
+        foreach (static::BOLEH_UBAH as $k) {
             if (array_key_exists($k, $data)) {
                 $set[] = "$k = ?";
                 $val[] = $data[$k] === '' ? null : $data[$k];
             }
         }
-        $adaTurunan = $daftar || array_intersect_key($data, self::ATURAN_TURUNAN);
+        $adaTurunan = $daftar || array_intersect_key($data, static::ATURAN_TURUNAN);
         if (! $set && ! $adaTurunan) {
             return $this->gagal('Tidak ada field yang diubah', 400);
         }
@@ -264,26 +281,31 @@ class Mahasiswa extends BaseApi
         if (! $this->nimValid($nim)) {
             return $this->gagal('NIM harus 10 digit angka', 422);
         }
+        $db = \Config\Database::connect();
         try {
-            $db = \Config\Database::connect();
+            // Akun login mahasiswa ikut dinonaktifkan dalam transaksi yang sama
+            $db->transException(true)->transBegin();
+            $db->query('UPDATE akademik.users SET is_active = FALSE WHERE nim = ?', [$nim]);
             $db->query('DELETE FROM akademik.mahasiswa WHERE nim = ?', [$nim]);
             if ($db->affectedRows() === 0) {
+                $db->transRollback();
                 return $this->gagal('Mahasiswa tidak ditemukan', 404);
             }
+            $db->transCommit();
             return $this->sukses(null, 'Mahasiswa berhasil dihapus');
         } catch (\Throwable $e) {
+            $db->transRollback();
             return $this->errorDb($e);
         }
     }
 
     // ---- pembantu ----
-// ---- pembantu ----
-private function nimValid($nim): bool
+protected function nimValid($nim): bool
 {
     return is_string($nim) && preg_match('/^\d{10}$/', $nim) === 1;
 }
 
-private function body(): ?array
+protected function body(): ?array
 {
     $json = $this->request->getJSON(true);
     return is_array($json) ? $json : null;
@@ -291,11 +313,11 @@ private function body(): ?array
 
 // Baca atribut banyak-nilai dari body. Hasil: ['hobi' => ['Membaca', ...], ...]
 // hanya untuk field yang dikirim, atau ['errors' => [...]] jika formatnya salah.
-private function bacaDaftar(array $data): array
+protected function bacaDaftar(array $data): array
 {
     $hasil  = [];
     $errors = [];
-    foreach (array_keys(self::DAFTAR) as $k) {
+    foreach (array_keys(static::DAFTAR) as $k) {
         if (! array_key_exists($k, $data)) {
             continue;
         }
@@ -331,7 +353,7 @@ private function bacaDaftar(array $data): array
 
 // Simpan alamat, orang tua, dan atribut banyak-nilai.
 // Dipanggil DI DALAM transaksi; jika ada error, pemanggil melakukan rollback.
-private function simpanTurunan($db, string $nim, array $data, array $daftar): void
+protected function simpanTurunan($db, string $nim, array $data, array $daftar): void
 {
     // 1. Alamat KTP & domisili (satu baris per jenis)
     foreach (['alamat_ktp' => 'KTP', 'alamat_domisili' => 'DOMISILI'] as $k => $jenis) {
@@ -389,7 +411,7 @@ private function simpanTurunan($db, string $nim, array $data, array $daftar): vo
 
     // 3. Atribut banyak-nilai: ganti seluruh isi untuk field yang dikirim
     foreach ($daftar as $k => $items) {
-        [$tabelRef, $tabelHubung, $fk] = self::DAFTAR[$k];
+        [$tabelRef, $tabelHubung, $fk] = static::DAFTAR[$k];
         $db->query("DELETE FROM akademik.$tabelHubung WHERE nim = ?", [$nim]);
         foreach ($items as $nama) {
             $row = $db->query("SELECT id FROM akademik.$tabelRef WHERE lower(nama) = lower(?) LIMIT 1", [$nama])->getRowArray();
@@ -400,7 +422,33 @@ private function simpanTurunan($db, string $nim, array $data, array $daftar): vo
     }
 }
 
-private function ambil(string $nim): ?array
+// Kode kelas milik mahasiswa (cth "TRPL 5B"), atau null jika tidak ditemukan.
+protected function kelasMahasiswa($db, string $nim): ?string
+{
+    $row = $db->query(
+        'SELECT k.kode FROM akademik.mahasiswa m JOIN akademik.kelas k ON k.id = m.kelas_id WHERE m.nim = ?',
+        [$nim]
+    )->getRowArray();
+
+    return $row['kode'] ?? null;
+}
+
+// Akun login untuk mahasiswa baru: username = NIM, password awal = tanggal lahir (DDMMYYYY).
+// Jika NIM pernah dihapus lalu ditambah lagi, akun lamanya diaktifkan kembali.
+protected function buatAkunMahasiswa($db, string $nim, string $tanggalLahir): void
+{
+    $passwordAwal = date('dmY', strtotime($tanggalLahir));
+    $db->query(
+        "INSERT INTO akademik.users (username, password_hash, role_id, nim)
+         SELECT ?, ?, r.id, ? FROM akademik.roles r WHERE r.nama = 'mahasiswa'
+         ON CONFLICT (username) DO UPDATE
+            SET nim = EXCLUDED.nim, password_hash = EXCLUDED.password_hash, is_active = TRUE
+          WHERE akademik.users.role_id = EXCLUDED.role_id",
+        [$nim, password_hash($passwordAwal, PASSWORD_DEFAULT), $nim]
+    );
+}
+
+protected function ambil(string $nim): ?array
 {
     return \Config\Database::connect()
         ->query('SELECT * FROM akademik.v_mahasiswa_detail WHERE nim = ?', [$nim])
