@@ -24,7 +24,12 @@
   const role = bacaToken().role || '';
   const bolehUbah = role === 'admin' || role === 'operator';
   const bolehHapus = role === 'admin';
-  if (!bolehUbah) return; // role lain: halaman tetap hanya-baca
+  if (!bolehUbah) {
+    // Web Admin hanya untuk admin & operator (sesi lama role lain diarahkan ke login)
+    localStorage.removeItem('token');
+    location.href = 'login.html';
+    return;
+  }
 
   // ---------- Pemanggil API untuk POST / PUT / PATCH / DELETE ----------
   async function kirim(method, path, body) {
