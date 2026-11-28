@@ -9,11 +9,15 @@ namespace App\Controllers\Api;
  */
 class Profil extends Mahasiswa
 {
-    // Data yang boleh diubah sendiri oleh mahasiswa.
-    // Data akademik & identitas (nama, NIM, kelas, status, email, tanggal lahir,
-    // agama, alamat KTP, orang tua) tetap hanya bisa diubah admin/operator.
+    // Data yang boleh diubah sendiri oleh mahasiswa: data pribadi, kontak, alamat,
+    // orang tua, dan minat. Yang TIDAK boleh (hanya admin/operator):
+    // NIM, nama, kelas, angkatan, status akademik, dan email kampus,
+    // karena itu data akademik resmi.
     private const BOLEH_DIUBAH_MAHASISWA = [
-        'no_telepon', 'cita_cita', 'alamat_domisili',
+        'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'agama_id', 'suku_id',
+        'no_telepon', 'cita_cita',
+        'alamat_ktp', 'alamat_domisili',
+        'nama_orang_tua', 'no_telepon_orang_tua', 'alamat_orang_tua',
         'keahlian', 'minat_bakat', 'bahasa', 'hobi', 'makanan_favorit', 'genre_musik',
     ];
 
