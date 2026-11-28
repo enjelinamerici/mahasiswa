@@ -27,6 +27,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
 
     // admin dan operator
     $routes->group('', ['filter' => 'jwt:admin,operator'], static function ($routes) {
+        $routes->get('statistik', 'Statistik::index');
+        $routes->get('statistik/mahasiswa', 'Statistik::mahasiswa');
         $routes->post('mahasiswa', 'Mahasiswa::create');
         $routes->put('mahasiswa/(:segment)', 'Mahasiswa::update/$1');
         $routes->patch('mahasiswa/(:segment)/kelas', 'Mahasiswa::pindahKelas/$1');

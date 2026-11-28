@@ -7,7 +7,7 @@ Data ini juga dipakai kelompok lain (API Jadwal, API Dosen, API Mata Kuliah, API
 
 | Aplikasi | Alamat | Pengguna | Fungsi |
 |---|---|---|---|
-| **App 1 – Web Admin** | `/web/login.html` | admin, operator | Kelola data semua mahasiswa: cari, detail, tambah, edit, pindah kelas, hapus (admin) |
+| **App 1 – Web Admin** | `/web/login.html` | admin, operator | Kelola data semua mahasiswa: cari, detail, tambah, edit, pindah kelas, hapus (admin), **dashboard statistik** |
 | **App 2 – Portal Mahasiswa** | `/portal/login.html` | mahasiswa | Profil sendiri, edit sebagian data diri, ganti password, teman sekelas, jadwal & mata kuliah (API Jadwal), organisasi (API Ormawa) |
 
 Kedua aplikasi hanya mengakses data lewat Web API ini (tidak ada akses database langsung) dan login lewat endpoint yang sama (`POST /api/v1/auth/login`).
@@ -33,7 +33,7 @@ Jadwal dan organisasi di Portal Mahasiswa diambil dari API kelompok lain; selama
    database.integrasi.username = app_integrasi
    database.integrasi.password = <password app_integrasi>
    ```
-3. Jalankan script di folder `database/` berurutan (01 → 08).
+3. Jalankan script di folder `database/` berurutan (01 → 09).
 4. `php spark serve`, lalu API tersedia di `http://localhost:8080/api/v1`.
 
 ## Role dan hak akses
@@ -65,6 +65,8 @@ Semua response berformat `{ "status", "message", "data" }`.
 | PUT | `/akun/password` | admin, operator, mahasiswa |
 | GET | `/profil` | mahasiswa |
 | PUT | `/profil` (wajib kirim `version`) | mahasiswa |
+| GET | `/statistik?kelas=&angkatan=` | admin, operator |
+| GET | `/statistik/mahasiswa?kategori=&nilai=&kelas=&angkatan=` | admin, operator |
 | GET | `/integrasi/kelas` | service, admin |
 | GET | `/integrasi/mahasiswa?nama=&kelas=&angkatan=&status=&limit=&page=` | service, admin |
 | GET | `/integrasi/mahasiswa/{nim}` | service, admin |
@@ -111,11 +113,30 @@ Mahasiswa yang ditambahkan lewat API otomatis dibuatkan akun login (username = N
 - Login: `POST /auth/login` dengan `{"username": "<NIM>", "password": "<DDMMYYYY>"}`.
   Response berisi `role` dan `password_awal` (`true` jika masih memakai tanggal lahir → portal mengingatkan untuk menggantinya).
 - `GET /profil` → biodata lengkap milik sendiri (NIM diambil dari token, bukan dari URL).
-- `PUT /profil` → mahasiswa hanya boleh mengubah: `no_telepon`, `cita_cita`, `alamat_domisili`, `keahlian`, `minat_bakat`, `bahasa`, `hobi`, `makanan_favorit`, `genre_musik`.
-  Field lain (nama, kelas, email, status, dll.) ditolak `422`. Wajib mengirim `version`; jika data sudah diubah admin → `409`.
+- `PUT /profil` → mahasiswa boleh mengubah data pribadi, kontak, alamat, orang tua, dan minat: `jenis_kelamin`, `tempat_lahir`, `tanggal_lahir`, `agama_id`, `suku_id`, `no_telepon`, `cita_cita`, `alamat_ktp`, `alamat_domisili`, `nama_orang_tua`, `no_telepon_orang_tua`, `alamat_orang_tua`, `keahlian`, `minat_bakat`, `bahasa`, `hobi`, `makanan_favorit`, `genre_musik`.
+  Data akademik resmi (`nim`, `nama`, `kelas_id`, `angkatan`, `status_akademik`, `email`) ditolak `422`. Wajib mengirim `version`; jika data sudah diubah admin → `409`.
+  Perubahan langsung terlihat di Web Admin dan ikut dihitung di statistik.
 - `PUT /akun/password` → `{"password_lama": "...", "password_baru": "...", "konfirmasi_password": "..."}` (password baru minimal 8 karakter).
 
 Contoh ubah profil:
 ```json
 { "version": 3, "no_telepon": "081234567890", "hobi": ["Membaca", "Futsal"], "alamat_domisili": "Jl. Kos No. 5" }
 ```
+
+
+## Statistik (Web Admin → tab Statistik)
+
+Dihitung dari view `v_profil_statistik` (`database/09_statistik.sql`). Kota/kabupaten diambil dari alamat berformat `Jl. ..., Kec. ..., Kota/Kab. ..., Provinsi`.
+
+| Statistik | Cara menghitung |
+|---|---|
+| Asal daerah | kota/kab. dari alamat **KTP** |
+| Kota domisili | kota/kab. dari alamat **domisili** |
+| Merantau | kota domisili ≠ kota asal (KTP) |
+| Tidak tinggal bersama orang tua | alamat domisili ≠ alamat orang tua (huruf besar-kecil, spasi & tanda baca diabaikan) |
+| Cita-cita | dikelompokkan tanpa membedakan huruf besar-kecil, dengan persentase |
+| Hobi, minat & bakat, keahlian, bahasa, makanan, genre musik | 10 terbanyak (satu mahasiswa bisa punya beberapa) |
+| Kelas, angkatan, jenis kelamin, agama, suku, status | jumlah & persentase |
+
+`GET /statistik/mahasiswa?kategori=<kategori>&nilai=<nilai>` mengembalikan daftar mahasiswa di balik satu angka, contoh
+`kategori=tinggal_bersama_ortu&nilai=tidak`, `kategori=kota_asal&nilai=Kota Tebing Tinggi`, `kategori=hobi&nilai=Futsal`.

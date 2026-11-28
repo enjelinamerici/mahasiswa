@@ -148,23 +148,23 @@ const HALAMAN = {
       </div>`;
     konten.innerHTML = `
       <div class="judul-hal" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
-        <div><h1>Profil Saya</h1><p>Data bertanda 🔒 hanya bisa diubah oleh admin akademik.</p></div>
+        <div><h1>Profil Saya</h1><p>Data bertanda 🔒 (data akademik resmi) hanya bisa diubah oleh admin. Selebihnya bisa Anda ubah sendiri.</p></div>
         <button class="btn btn-utama" id="btnEdit" type="button">✏️ Edit Profil</button>
       </div>
       <div class="kartu"><div class="kartu-judul"><h2>Identitas & Akademik</h2></div><div class="field-grid">
         ${f('NIM', p.nim, { kunci: 1 })}${f('Nama Lengkap', p.nama, { kunci: 1 })}${f('Kelas', p.kelas, { kunci: 1 })}
         ${f('Angkatan', p.angkatan, { kunci: 1 })}${f('Status Akademik', p.status_akademik, { kunci: 1 })}
-        ${f('Jenis Kelamin', p.jenis_kelamin === 'L' ? 'Laki-laki' : p.jenis_kelamin === 'P' ? 'Perempuan' : '', { kunci: 1 })}
-        ${f('Tempat, Tanggal Lahir', [p.tempat_lahir, tanggalIndo(p.tanggal_lahir)].filter(Boolean).join(', '), { kunci: 1 })}
-        ${f('Agama', p.agama, { kunci: 1 })}${f('Suku', p.suku, { kunci: 1 })}
+        ${f('Jenis Kelamin', p.jenis_kelamin === 'L' ? 'Laki-laki' : p.jenis_kelamin === 'P' ? 'Perempuan' : '')}
+        ${f('Tempat, Tanggal Lahir', [p.tempat_lahir, tanggalIndo(p.tanggal_lahir)].filter(Boolean).join(', '))}
+        ${f('Agama', p.agama)}${f('Suku', p.suku)}
       </div></div>
       <div class="kartu"><div class="kartu-judul"><h2>Kontak & Alamat</h2></div><div class="field-grid">
         ${f('Email', p.email, { kunci: 1 })}${f('No. Telepon', p.no_telepon)}
-        ${f('Alamat KTP', p.alamat_ktp, { kunci: 1, full: 1 })}${f('Alamat Domisili', p.alamat_domisili, { full: 1 })}
+        ${f('Alamat KTP', p.alamat_ktp, { full: 1 })}${f('Alamat Domisili', p.alamat_domisili, { full: 1 })}
       </div></div>
       <div class="kartu"><div class="kartu-judul"><h2>Orang Tua / Wali</h2></div><div class="field-grid">
-        ${f('Nama', p.nama_orang_tua, { kunci: 1 })}${f('No. Telepon', p.no_telepon_orang_tua, { kunci: 1 })}
-        ${f('Alamat', p.alamat_orang_tua, { kunci: 1, full: 1 })}
+        ${f('Nama', p.nama_orang_tua)}${f('No. Telepon', p.no_telepon_orang_tua)}
+        ${f('Alamat', p.alamat_orang_tua, { full: 1 })}
       </div></div>
       <div class="kartu"><div class="kartu-judul"><h2>Minat, Keahlian & Cita-cita</h2></div><div class="field-grid">
         ${f('Minat & Bakat', p.minat_bakat)}${f('Keahlian', p.keahlian)}${f('Cita-cita', p.cita_cita)}
@@ -292,44 +292,73 @@ const HALAMAN = {
 const FIELD_DAFTAR = ['minat_bakat', 'keahlian', 'bahasa', 'hobi', 'makanan_favorit', 'genre_musik'];
 
 async function halamanEditProfil() {
-  const p = await profil(true); // ambil versi terbaru sebelum mengedit
+  konten.innerHTML = '<div class="memuat">Memuat formulir…</div>';
+  const [p, agama, suku] = await Promise.all([profil(true), referensi('/agama'), referensi('/suku')]);
+  const idDari = (daftar, nama) => (daftar.find((x) => x.nama === nama) || {}).id || '';
   const daftarHint = 'Pisahkan dengan koma, cth. Membaca, Futsal';
   konten.innerHTML = `
-    <div class="judul-hal"><h1>Edit Profil</h1><p>Data identitas & akademik hanya bisa diubah admin. Hubungi admin jika ada yang keliru.</p></div>
-    <div class="kartu">
-      <div id="pesanEdit"></div>
-      <form id="formProfil" class="form-grid" novalidate>
-        ${inputForm('no_telepon', 'No. Telepon', p.no_telepon, { hint: '10–14 digit angka, tanpa spasi atau +' })}
+    <div class="judul-hal"><h1>Edit Profil</h1>
+      <p>NIM, nama, kelas, angkatan, status akademik, dan email kampus hanya bisa diubah admin. Hubungi admin jika ada yang keliru.</p></div>
+    <div id="pesanEdit"></div>
+    <form id="formProfil" novalidate>
+      <div class="kartu"><div class="kartu-judul"><h2>Data Pribadi</h2></div><div class="form-grid">
+        ${pilihanForm('jenis_kelamin', 'Jenis Kelamin', [['L', 'Laki-laki'], ['P', 'Perempuan']], p.jenis_kelamin)}
+        ${inputForm('tempat_lahir', 'Tempat Lahir', p.tempat_lahir)}
+        ${inputForm('tanggal_lahir', 'Tanggal Lahir', p.tanggal_lahir ? String(p.tanggal_lahir).slice(0, 10) : '', { tipe: 'date', hint: 'Mengubah tanggal lahir tidak mengubah password Anda.' })}
+        ${pilihanForm('agama_id', 'Agama', agama.map((a) => [a.id, a.nama]), idDari(agama, p.agama))}
+        ${pilihanForm('suku_id', 'Suku', suku.map((x) => [x.id, x.nama]), idDari(suku, p.suku), '-- pilih --')}
         ${inputForm('cita_cita', 'Cita-cita', p.cita_cita)}
-        ${inputForm('alamat_domisili', 'Alamat Domisili', p.alamat_domisili, { full: 1 })}
+      </div></div>
+      <div class="kartu"><div class="kartu-judul"><h2>Kontak & Alamat</h2></div><div class="form-grid">
+        ${inputForm('no_telepon', 'No. Telepon', p.no_telepon, { hint: '10–14 digit angka, tanpa spasi atau +' })}
+        ${inputForm('alamat_ktp', 'Alamat KTP', p.alamat_ktp, { full: 1, hint: 'Format: Jl. ..., Kec. ..., Kota/Kab. ..., Provinsi' })}
+        ${inputForm('alamat_domisili', 'Alamat Domisili', p.alamat_domisili, { full: 1, hint: 'Tempat tinggal saat kuliah. Format sama seperti alamat KTP.' })}
+      </div></div>
+      <div class="kartu"><div class="kartu-judul"><h2>Orang Tua / Wali</h2></div><div class="form-grid">
+        ${inputForm('nama_orang_tua', 'Nama Orang Tua / Wali', p.nama_orang_tua)}
+        ${inputForm('no_telepon_orang_tua', 'No. Telepon Orang Tua', p.no_telepon_orang_tua, { hint: '10–14 digit angka' })}
+        ${inputForm('alamat_orang_tua', 'Alamat Orang Tua', p.alamat_orang_tua, { full: 1 })}
+      </div></div>
+      <div class="kartu"><div class="kartu-judul"><h2>Minat & Keahlian</h2></div><div class="form-grid">
         ${inputForm('minat_bakat', 'Minat & Bakat', p.minat_bakat, { hint: daftarHint })}
         ${inputForm('keahlian', 'Keahlian (Skill)', p.keahlian, { hint: daftarHint })}
         ${inputForm('bahasa', 'Bahasa yang Dikuasai', p.bahasa, { hint: daftarHint })}
         ${inputForm('hobi', 'Hobi', p.hobi, { hint: daftarHint })}
         ${inputForm('makanan_favorit', 'Makanan Favorit', p.makanan_favorit, { hint: daftarHint })}
         ${inputForm('genre_musik', 'Genre Musik', p.genre_musik, { hint: daftarHint })}
-      </form>
-      <div class="aksi">
-        <button class="btn btn-garis" id="btnBatal" type="button">Batal</button>
-        <button class="btn btn-utama" id="btnSimpan" type="button">Simpan Perubahan</button>
-      </div>
+      </div></div>
+    </form>
+    <div class="aksi">
+      <button class="btn btn-garis" id="btnBatal" type="button">Batal</button>
+      <button class="btn btn-utama" id="btnSimpan" type="button">Simpan Perubahan</button>
     </div>`;
   $('btnBatal').addEventListener('click', () => HALAMAN.profil());
   $('btnSimpan').addEventListener('click', async () => {
     const data = bacaForm('formProfil');
     bersihkanError('formProfil');
-    if (data.no_telepon && !/^\d{10,14}$/.test(data.no_telepon)) {
-      return tandaiError('formProfil', { no_telepon: 'No. telepon harus 10–14 digit angka' });
+    const salah = {};
+    if (data.no_telepon && !/^\d{10,14}$/.test(data.no_telepon)) salah.no_telepon = 'No. telepon harus 10–14 digit angka';
+    if (data.no_telepon_orang_tua && !/^\d{10,14}$/.test(data.no_telepon_orang_tua)) salah.no_telepon_orang_tua = 'No. telepon harus 10–14 digit angka';
+    if (!data.nama_orang_tua && (data.no_telepon_orang_tua || data.alamat_orang_tua)) salah.nama_orang_tua = 'Isi nama orang tua/wali terlebih dahulu';
+    if (!data.tempat_lahir) salah.tempat_lahir = 'Tempat lahir wajib diisi';
+    if (!data.tanggal_lahir) salah.tanggal_lahir = 'Tanggal lahir wajib diisi';
+    if (Object.keys(salah).length) {
+      tandaiError('formProfil', salah);
+      $('pesanEdit').innerHTML = '<div class="info merah">Periksa kembali isian yang ditandai merah.</div>';
+      return;
     }
     FIELD_DAFTAR.forEach((k) => { data[k] = data[k].split(',').map((x) => x.trim()).filter(Boolean); });
+    data.agama_id = Number(data.agama_id);
+    if (data.suku_id) data.suku_id = Number(data.suku_id); else delete data.suku_id;
     data.version = Number(p.version); // optimistic locking: tolak jika data sudah diubah orang lain
 
     await kirimDenganTombol($('btnSimpan'), async () => {
       const r = await api('PUT', '/profil', data);
       if (r.kode === 200) {
         cache.profil = r.json.data;
+        isiHeader(cache.profil);
         await HALAMAN.profil();
-        konten.insertAdjacentHTML('afterbegin', '<div class="info hijau">✅ Profil berhasil diperbarui.</div>');
+        konten.insertAdjacentHTML('afterbegin', '<div class="info hijau">✅ Profil berhasil diperbarui. Perubahan langsung terlihat oleh admin.</div>');
       } else if (r.kode === 409) {
         $('pesanEdit').innerHTML = `<div class="info merah">Data Anda baru saja diubah di tempat lain (misalnya oleh admin).
           <a href="#" id="muatUlang">Muat ulang data terbaru</a>, lalu ulangi perubahan Anda.</div>`;
@@ -338,8 +367,18 @@ async function halamanEditProfil() {
         tandaiError('formProfil', r.json.errors || {});
         $('pesanEdit').innerHTML = `<div class="info merah">${esc(r.json.message || 'Gagal menyimpan')}</div>`;
       }
+      window.scrollTo(0, 0);
     });
   });
+}
+
+const cacheReferensi = {};
+async function referensi(path) {
+  if (!cacheReferensi[path]) {
+    const r = await api('GET', path);
+    cacheReferensi[path] = r.kode === 200 ? r.json.data : [];
+  }
+  return cacheReferensi[path];
 }
 
 // ---------- Pembantu tampilan ----------
@@ -357,6 +396,13 @@ function inputForm(nama, label, nilai, o = {}) {
     ${o.hint ? `<div class="hint">${o.hint}</div>` : ''}
     <div class="err" data-err="${nama}"></div>
   </div>`;
+}
+function pilihanForm(nama, label, opsi, terpilih, kosong) {
+  const daftar = (kosong ? `<option value="">${kosong}</option>` : '') + opsi.map(([v, t]) =>
+    `<option value="${esc(v)}"${String(v) === String(terpilih) ? ' selected' : ''}>${esc(t)}</option>`).join('');
+  return `<div><label class="lbl" for="in_${nama}">${label}</label>
+    <select class="input" id="in_${nama}" name="${nama}">${daftar}</select>
+    <div class="err" data-err="${nama}"></div></div>`;
 }
 function bacaForm(id) {
   const data = {};
