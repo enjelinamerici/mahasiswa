@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Masuk — Portal Mahasiswa TRPL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body class="login-body">
+  <div class="login-kartu">
+    <div class="logo-ikon">PM</div>
+    <h1>Portal Mahasiswa</h1>
+    <p class="sub">Teknologi Rekayasa Perangkat Lunak</p>
+    <form id="formLogin" novalidate>
+      <div class="group">
+        <label class="lbl" for="username">NIM</label>
+        <input class="input" id="username" inputmode="numeric" maxlength="10" placeholder="10 digit NIM" autocomplete="username" required>
+      </div>
+      <div class="group">
+        <label class="lbl" for="password">Password</label>
+        <input class="input" id="password" type="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-utama" id="btnMasuk" type="submit">Masuk</button>
+    </form>
+    <div id="pesanLogin"></div>
+    <p class="login-catatan">Login pertama: password awal adalah tanggal lahir (DDMMYYYY), contoh lahir 15 Mei 2005 → <b>15052005</b>.</p>
+  </div>
+  <script>
+    const KUNCI_TOKEN = 'portal_token';
+    if (localStorage.getItem(KUNCI_TOKEN)) location.replace('index.html');
+    const pesanAwal = new URLSearchParams(location.search).get('pesan');
+    if (pesanAwal) document.getElementById('pesanLogin').textContent = pesanAwal;
+
+    document.getElementById('formLogin').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pesan = document.getElementById('pesanLogin');
+      const btn = document.getElementById('btnMasuk');
+      const nim = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (!/^\d{10}$/.test(nim)) { pesan.textContent = 'NIM harus 10 digit angka.'; return; }
+      if (!password) { pesan.textContent = 'Password wajib diisi.'; return; }
+
+      btn.disabled = true; btn.textContent = 'Memeriksa...'; pesan.textContent = '';
+      try {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: nim, password }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.data && json.data.token) {
+          if (json.data.role !== 'mahasiswa') {
+            pesan.innerHTML = 'Portal ini khusus mahasiswa. Admin/operator silakan masuk lewat <a href="../web/login.html">Web Admin</a>.';
+          } else {
+            localStorage.setItem(KUNCI_TOKEN, json.data.token);
+            localStorage.setItem('portal_password_awal', json.data.password_awal ? '1' : '0');
+            location.replace('index.html');
+            return;
+          }
+        } else if (res.status === 429) {
+          pesan.textContent = json.message || 'Terlalu banyak percobaan. Coba lagi sebentar lagi.';
+        } else {
+          pesan.textContent = json.message || 'NIM atau password salah.';
+        }
+      } catch (err) {
+        pesan.textContent = 'Tidak dapat terhubung ke server.';
+      }
+      btn.disabled = false; btn.textContent = 'Masuk';
+    });
+  </script>
+</body>
+</html>
