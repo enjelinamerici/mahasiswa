@@ -22,6 +22,15 @@ class Kelas extends BaseApi
             return $this->gagal('Kelas tidak ditemukan', 404);
         }
 
+        // Role mahasiswa hanya boleh melihat daftar kelasnya sendiri
+        $u = $this->pengguna();
+        if ($u && $u->role === 'mahasiswa') {
+            $milik = $db->query('SELECT kelas_id FROM akademik.mahasiswa WHERE nim = ?', [(string) ($u->nim ?? '')])->getRowArray();
+            if (! $milik || (int) $milik['kelas_id'] !== (int) $id) {
+                return $this->gagal('Anda hanya boleh melihat daftar kelas sendiri', 403);
+            }
+        }
+
         $rows = $db->query(
             'SELECT p.* FROM akademik.v_mahasiswa_publik p
                JOIN akademik.kelas k ON k.kode = p.kelas
