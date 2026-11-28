@@ -6,7 +6,7 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Home::index');
 
 $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function ($routes) {
-    $routes->post('auth/login', 'Auth::login');
+       $routes->post('auth/login', 'Auth::login', ['filter' => 'batasLogin']); 
 
     // admin, operator, mahasiswa (role service TIDAK boleh membaca data lengkap)
     $routes->group('', ['filter' => 'jwt:admin,operator,mahasiswa'], static function ($routes) {

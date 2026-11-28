@@ -43,6 +43,11 @@ class Integrasi extends BaseApi
         $where = [];
         $param = [];
         if ($kelas = $this->request->getGet('kelas')) {
+                    if ($nama = trim((string) $this->request->getGet('nama'))) {
+           
+            $where[] = 'nama ILIKE ?';
+            $param[] = '%' . addcslashes($nama, '%_\\') . '%';
+        }
             $where[] = 'kelas = ?';
             $param[] = $kelas;
         }

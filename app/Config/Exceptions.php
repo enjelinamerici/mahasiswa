@@ -101,6 +101,7 @@ class Exceptions extends BaseConfig
      */
     public function handler(int $statusCode, Throwable $exception): ExceptionHandlerInterface
     {
-        return new ExceptionHandler($this);
+                // API: error di mode production tetap dijawab JSON seragam
+        return new \App\Libraries\ApiExceptionHandler($this);
     }
 }
