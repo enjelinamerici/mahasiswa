@@ -16,6 +16,13 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api'], static function
         $routes->get('kelas/(:num)/mahasiswa', 'Kelas::mahasiswa/$1');
         $routes->get('agama', 'Referensi::agama');
         $routes->get('suku', 'Referensi::suku');
+        $routes->put('akun/password', 'Akun::gantiPassword');
+    });
+
+    // mahasiswa: profil milik sendiri (Portal Mahasiswa / App 2)
+    $routes->group('', ['filter' => 'jwt:mahasiswa'], static function ($routes) {
+        $routes->get('profil', 'Profil::saya');
+        $routes->put('profil', 'Profil::ubah');
     });
 
     // admin dan operator
